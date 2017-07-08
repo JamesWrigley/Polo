@@ -1,14 +1,23 @@
 import sys
 
-from PyQt5.QtGui import QPixmap
 from PyQt5.QtSvg import QSvgWidget
+from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtGui import QKeySequence, QPixmap
 from PyQt5.QtWidgets import (QApplication, QDesktopWidget, QLabel, QFileDialog, QMessageBox,
                              QPushButton, QHBoxLayout, QVBoxLayout, QWidget, QStackedWidget)
 
+class DisplayWidget(QLabel):
+    closed = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+
+    def closeEvent(self, event):
+        self.closed.emit()
 
 class Polo(QWidget):
-    media_preview_stack = None
     display_widget = None
+    media_preview_stack = None
 
     def __init__(self):
         super().__init__()
@@ -20,7 +29,7 @@ class Polo(QWidget):
         self.center_widget(self, 0)
 
         # Create widgets
-        self.display_widget = QLabel()
+        self.display_widget = DisplayWidget()
         self.media_preview_stack = QStackedWidget()
         open_button = QPushButton("Open")
         clear_button = QPushButton("Clear")
@@ -29,6 +38,7 @@ class Polo(QWidget):
         self.media_preview_stack.addWidget(QLabel())
         self.display_widget.setScaledContents(True)
         self.display_widget.setStyleSheet("background-color: rgb(20, 20, 20);")
+        self.display_widget.closed.connect(self.close)
         open_button.clicked.connect(self.choose_media)
         clear_button.clicked.connect(self.clear_media)
         open_button.setToolTip("Choose a media file to display")
