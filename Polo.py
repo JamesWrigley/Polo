@@ -85,8 +85,9 @@ class Polo(QWidget):
         self.show()
 
     def choose_media(self):
-        media = QFileDialog.getOpenFileName(self, "Select Media")
-        if media:
+        media = QFileDialog.getOpenFileName(self, "Select Media",
+                                            filter="Images (*.jpeg *.jpg *.png, *.gif)")
+        if media[0]:
             self.display_widget.setPixmap(QPixmap(media[0]))
             preview_label = self.media_preview_stack.widget(1)
             preview_label.setStyleSheet("border-image: url({0})".format(media[0]))
