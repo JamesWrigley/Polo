@@ -83,7 +83,7 @@ class Polo(QWidget):
         if desktop_widget.screenCount() != 2:
             QMessageBox.warning(self, "Warning", "Cannot find a second screen, " \
                                                  "display will be on primary screen.")
-            self.display_widget.resize(500, 500)
+            self.display_widget.showMaximized()
         else:
             self.center_widget(self.display_widget, 1)
             self.display_widget.showFullScreen()
