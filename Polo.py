@@ -3,8 +3,9 @@ import sys
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QKeySequence, QPixmap
-from PyQt5.QtWidgets import (QApplication, QDesktopWidget, QLabel, QFileDialog, QMessageBox,
-                             QPushButton, QHBoxLayout, QVBoxLayout, QWidget, QStackedWidget)
+from PyQt5.QtWidgets import (QApplication, QDesktopWidget, QLabel, QFileDialog,
+                             QMessageBox, QPushButton, QHBoxLayout, QVBoxLayout,
+                             QWidget, QShortcut, QStackedWidget)
 
 class DisplayWidget(QLabel):
     closed = pyqtSignal()
@@ -43,6 +44,14 @@ class Polo(QWidget):
         clear_button.clicked.connect(self.clear_media)
         open_button.setToolTip("Choose a media file to display")
         clear_button.setToolTip("Clear the current media and turn off the display")
+
+        # Set shortcuts
+        open_shortcut = QShortcut(QKeySequence("O"), self)
+        clear_shortcut = QShortcut(QKeySequence("C"), self)
+        close_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
+        open_shortcut.activated.connect(self.choose_media)
+        clear_shortcut.activated.connect(self.clear_media)
+        close_shortcut.activated.connect(self.close)
 
         # Pack layouts
         hbox = QHBoxLayout()
