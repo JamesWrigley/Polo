@@ -1,4 +1,6 @@
 import sys
+from PIL import Image, ImageOps
+from PIL.ImageQt import ImageQt
 
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtCore import pyqtSignal
@@ -17,6 +19,7 @@ class DisplayWidget(QLabel):
         self.closed.emit()
 
 class Polo(QWidget):
+    qmedia = None
     display_widget = None
     media_preview_stack = None
 
@@ -85,13 +88,60 @@ class Polo(QWidget):
         self.show()
 
     def choose_media(self):
-        media = QFileDialog.getOpenFileName(self, "Select Media",
-                                            filter="Images (*.jpeg *.jpg *.png, *.gif)")
-        if media[0]:
-            self.display_widget.setPixmap(QPixmap(media[0]))
+        media_path = QFileDialog.getOpenFileName(self, "Select Media",
+                                                 filter="Images (*.jpeg *.jpg *.png, *.gif)")
+        if media_path[0]:
+            media = self.hologrify(Image.open(media_path[0]))
+            self.qmedia = ImageQt(media)
+
+            self.display_widget.setPixmap(QPixmap.fromImage(self.qmedia))
             preview_label = self.media_preview_stack.widget(1)
-            preview_label.setStyleSheet("border-image: url({0})".format(media[0]))
+            preview_label.setStyleSheet("border-image: url({0})".format(media_path[0]))
             self.media_preview_stack.setCurrentIndex(1)
+
+    def hologrify(self, media):
+        # Dimensions of the screen, assuming `self.display_widget` is fullscreen
+        center_length_mm = 100
+        screen_width_mm = self.display_widget.widthMM()
+        screen_height_mm = self.display_widget.heightMM()
+        screen_width_px = self.display_widget.width()
+        screen_height_px = self.display_widget.height()
+
+        # Calculate the bounding box side length of each of the images
+        x_media_length_mm = (screen_width_mm - center_length_mm) / 2
+        y_media_length_mm = (screen_height_mm - center_length_mm) / 2
+        media_length_mm = min(x_media_length_mm, y_media_length_mm)
+
+        # Convert to pixels
+        media_length_px = int(media_length_mm * self.display_widget.physicalDpiX() / 25.4)
+        center_length_px = int(center_length_mm * self.display_widget.physicalDpiX() / 25.4)
+
+        hologrified_media = Image.new("RGB", (screen_width_px, screen_height_px), (20, 20, 20))
+
+        # Draw on the new image
+        top = media.copy()
+        top.thumbnail((media_length_px, media_length_px))
+        top_x = int((screen_width_px - media_length_px) / 2)
+        top_y = 0
+
+        bottom = ImageOps.flip(top)
+        bottom_x = top_x
+        bottom_y = screen_height_px - media_length_px
+
+        left = top.rotate(90, expand=True)
+        left_x = 0
+        left_y = media_length_px
+
+        right = ImageOps.mirror(left)
+        right_x = screen_width_px - media_length_px
+        right_y = media_length_px
+
+        hologrified_media.paste(top, (top_x, top_y))
+        hologrified_media.paste(bottom, (bottom_x, bottom_y))
+        hologrified_media.paste(left, (left_x, left_y))
+        hologrified_media.paste(right, (right_x, right_y))
+
+        return hologrified_media
 
     def clear_media(self):
         self.display_widget.clear()
