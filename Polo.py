@@ -96,7 +96,7 @@ class Polo(QWidget):
 
     def choose_media(self):
         media_path = QFileDialog.getOpenFileName(self, "Select Media",
-                                                 filter="Images (*.jpeg *.jpg *.png, *.gif)")
+                                                 filter="Images (*.jpeg *.jpg *.png *.gif)")
         if media_path[0]:
             media = self.hologrify(Image.open(media_path[0]))
             self.qmedia = ImageQt(media)
