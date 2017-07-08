@@ -1,4 +1,6 @@
 import sys
+import argparse
+
 from PIL import Image, ImageOps
 from PIL.ImageQt import ImageQt
 
@@ -8,6 +10,11 @@ from PyQt5.QtGui import QKeySequence, QPixmap
 from PyQt5.QtWidgets import (QApplication, QDesktopWidget, QLabel, QFileDialog,
                              QMessageBox, QPushButton, QHBoxLayout, QVBoxLayout,
                              QWidget, QShortcut, QStackedWidget)
+
+arg_parser = argparse.ArgumentParser("Polo")
+arg_parser.add_argument("--debug", action="store_true",
+                        help="Enable debug mode (show bounding boxes)")
+args = arg_parser.parse_args()
 
 class DisplayWidget(QLabel):
     closed = pyqtSignal()
@@ -135,6 +142,17 @@ class Polo(QWidget):
         right = ImageOps.mirror(left)
         right_x = screen_width_px - media_length_px
         right_y = media_length_px
+
+        # If in debug mode, draw the bounding boxes
+        if args.debug:
+            center = Image.new("RGB", (center_length_px, center_length_px), (255, 0, 0))
+            bounding_box = Image.new("RGB", (media_length_px, media_length_px), (0, 128, 0))
+
+            hologrified_media.paste(center, (top_x, int((screen_height_px - center_length_px) / 2)))
+            hologrified_media.paste(bounding_box, (top_x, top_y))
+            hologrified_media.paste(bounding_box, (bottom_x, bottom_y))
+            hologrified_media.paste(bounding_box, (left_x, left_y))
+            hologrified_media.paste(bounding_box, (right_x, right_y))
 
         hologrified_media.paste(top, (top_x, top_y))
         hologrified_media.paste(bottom, (bottom_x, bottom_y))
