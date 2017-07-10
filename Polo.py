@@ -11,12 +11,18 @@ from PyQt5.QtWidgets import (QApplication, QDesktopWidget, QLabel, QFileDialog,
                              QMessageBox, QPushButton, QHBoxLayout, QVBoxLayout,
                              QWidget, QShortcut, QStackedWidget)
 
+
+# Parse command-line arguments
 arg_parser = argparse.ArgumentParser("Polo")
 arg_parser.add_argument("--debug", action="store_true",
                         help="Enable debug mode (show bounding boxes)")
 args = arg_parser.parse_args()
 
+
 class DisplayWidget(QLabel):
+    """
+    A subclass of QLabel that provides a closed() signal.
+    """
     closed = pyqtSignal()
 
     def __init__(self):
@@ -26,11 +32,22 @@ class DisplayWidget(QLabel):
         self.closed.emit()
 
 class Polo(QWidget):
+    # The hologrified media as a Qt-compatible object (i.e. ImageQt)
     qmedia = None
+
+    # The widget in the slave window that displays `qmedia`
     display_widget = None
+
+    # A QStackedWidget that holds both preview widgets, the first being a
+    # QSvgWidget displaying the default preview image, and the second being a
+    # QLabel that displays the users selected media.
     media_preview_stack = None
 
     def __init__(self):
+        """
+        Constructor for the main application class. Creates the GUI and sets up
+        the initial state.
+        """
         super().__init__()
 
         desktop_widget = QDesktopWidget()
@@ -45,11 +62,14 @@ class Polo(QWidget):
         open_button = QPushButton("Open")
         clear_button = QPushButton("Clear")
 
+        # Configure
         self.media_preview_stack.addWidget(QSvgWidget("blank.svg"))
         self.media_preview_stack.addWidget(QLabel())
         self.display_widget.setScaledContents(True)
         self.display_widget.setStyleSheet("background-color: rgb(20, 20, 20);")
         self.display_widget.closed.connect(self.close)
+
+        # Set up connections
         open_button.clicked.connect(self.choose_media)
         clear_button.clicked.connect(self.clear_media)
         open_button.setToolTip("Choose a media file to display")
@@ -95,6 +115,10 @@ class Polo(QWidget):
         self.show()
 
     def choose_media(self):
+        """
+        Open a dialog for the user to select a media file (currently only images
+        are supported).
+        """
         media_path = QFileDialog.getOpenFileName(self, "Select Media",
                                                  filter="Images (*.jpeg *.jpg *.png *.gif)")
         if media_path[0]:
@@ -107,7 +131,14 @@ class Polo(QWidget):
             self.media_preview_stack.setCurrentIndex(1)
 
     def hologrify(self, media):
+        """
+        Mirror the given media file in four directions for use as a hologram
+        image. Note that the media is mirrored in the left side of the screen,
+        leaving the right side to be used for some other purpose.
+        """
         # Dimensions of the screen, assuming `self.display_widget` is fullscreen
+        # and it is running on our TV. We need to hardcode some values for the TV
+        # since Qt cannot obtain the correct ones by itself.
         center_length_mm = 100
         dpi = 68.84
         screen_width_mm = 701 # self.display_widget.widthMM()
@@ -123,9 +154,7 @@ class Polo(QWidget):
         media_length_px = int(media_length_mm * dpi / 25.4)
         center_length_px = int(center_length_mm * dpi / 25.4)
 
-        hologrified_media = Image.new("RGBA", (screen_width_px, screen_height_px), (20, 20, 20))
-
-        # Draw on the new image
+        # Create the mirrored images, and calculate their locations
         top = media.copy()
         top.thumbnail((media_length_px, media_length_px))
         top_x = int((screen_height_px - top.width) / 2)
@@ -143,7 +172,9 @@ class Polo(QWidget):
         right_x = screen_height_px - right.width - top_y
         right_y = left_y
 
-        # If in debug mode, draw the center square
+        hologrified_media = Image.new("RGBA", (screen_width_px, screen_height_px), (0, 0, 0))
+
+        # If in debug mode, draw the center square and bounding boxes
         if args.debug:
             hologram = Image.new("RGB", (screen_height_px, screen_height_px), (0, 157, 172))
             context = Image.new("RGB", (screen_height_px, screen_height_px), (173, 243, 0))
@@ -154,6 +185,7 @@ class Polo(QWidget):
             hologrified_media.paste(context, (screen_height_px, 0))
             hologrified_media.paste(center, (center_coord, center_coord))
 
+        # Draw the mirrored images
         for img, corner in zip([top, bottom, left, right],
                                   [(top_x, top_y), (bottom_x, bottom_y),
                                    (left_x, left_y), (right_x, right_y)]):
@@ -163,16 +195,26 @@ class Polo(QWidget):
         return hologrified_media
 
     def clear_media(self):
+        """
+        Reset the display widget to a solid color and the preview to the default
+        SVG image (crosses).
+        """
         self.display_widget.clear()
         self.media_preview_stack.setCurrentIndex(0)
 
     def center_widget(self, widget, screen):
+        """
+        Centers the given widget in the given screen.
+        """
         frame = widget.frameGeometry()
         screen_center = QDesktopWidget().availableGeometry(screen).center()
         frame.moveCenter(screen_center)
         widget.move(frame.topLeft())
 
     def closeEvent(self, event):
+        """
+        An override to close the slave window when the master window closes.
+        """
         self.display_widget.close()
 
 
