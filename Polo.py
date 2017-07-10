@@ -109,8 +109,9 @@ class Polo(QWidget):
     def hologrify(self, media):
         # Dimensions of the screen, assuming `self.display_widget` is fullscreen
         center_length_mm = 100
-        screen_width_mm = self.display_widget.widthMM()
-        screen_height_mm = self.display_widget.heightMM()
+        dpi = 68.84
+        screen_width_mm = 701 # self.display_widget.widthMM()
+        screen_height_mm = 398 # self.display_widget.heightMM()
         screen_width_px = self.display_widget.width()
         screen_height_px = self.display_widget.height()
 
@@ -120,8 +121,8 @@ class Polo(QWidget):
         media_length_mm = min(x_media_length_mm, y_media_length_mm)
 
         # Convert to pixels
-        media_length_px = int(media_length_mm * self.display_widget.physicalDpiX() / 25.4)
-        center_length_px = int(center_length_mm * self.display_widget.physicalDpiX() / 25.4)
+        media_length_px = int(media_length_mm * dpi / 25.4)
+        center_length_px = int(center_length_mm * dpi / 25.4)
 
         hologrified_media = Image.new("RGB", (screen_width_px, screen_height_px), (20, 20, 20))
 
