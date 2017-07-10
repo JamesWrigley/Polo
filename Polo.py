@@ -123,7 +123,7 @@ class Polo(QWidget):
         media_length_px = int(media_length_mm * dpi / 25.4)
         center_length_px = int(center_length_mm * dpi / 25.4)
 
-        hologrified_media = Image.new("RGB", (screen_width_px, screen_height_px), (20, 20, 20))
+        hologrified_media = Image.new("RGBA", (screen_width_px, screen_height_px), (20, 20, 20))
 
         # Draw on the new image
         top = media.copy()
@@ -150,13 +150,15 @@ class Polo(QWidget):
             center = Image.new("RGB", (center_length_px, center_length_px), (255, 0, 0))
             center_coord = int((screen_height_px - center_length_px) / 2)
 
-        hologrified_media.paste(top, (top_x, top_y))
-        hologrified_media.paste(bottom, (bottom_x, bottom_y))
-        hologrified_media.paste(left, (left_x, left_y))
-        hologrified_media.paste(right, (right_x, right_y))
             hologrified_media.paste(hologram, (0, 0))
             hologrified_media.paste(context, (screen_height_px, 0))
             hologrified_media.paste(center, (center_coord, center_coord))
+
+        for img, corner in zip([top, bottom, left, right],
+                                  [(top_x, top_y), (bottom_x, bottom_y),
+                                   (left_x, left_y), (right_x, right_y)]):
+            hologrified_media.paste(img, corner,
+                                    img.split()[-1] if img.mode == "RGBA" else None)
 
         return hologrified_media
 
