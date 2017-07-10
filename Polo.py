@@ -115,10 +115,9 @@ class Polo(QWidget):
         screen_width_px = self.display_widget.width()
         screen_height_px = self.display_widget.height()
 
-        # Calculate the bounding box side length of each of the images
-        x_media_length_mm = (screen_width_mm - center_length_mm) / 2
-        y_media_length_mm = (screen_height_mm - center_length_mm) / 2
-        media_length_mm = min(x_media_length_mm, y_media_length_mm)
+        # Calculate the bounding box side length of each of the images, based
+        # off the height because that's our limiting dimension.
+        media_length_mm = (screen_height_mm - center_length_mm) / 2
 
         # Convert to pixels
         media_length_px = int(media_length_mm * dpi / 25.4)
@@ -129,37 +128,35 @@ class Polo(QWidget):
         # Draw on the new image
         top = media.copy()
         top.thumbnail((media_length_px, media_length_px))
-        top_x = int((screen_width_px - media_length_px) / 2)
-        top_y = 0
+        top_x = int((screen_height_px - top.width) / 2)
+        top_y = int(((screen_height_px - center_length_px) / 2 - top.height) / 2)
 
         bottom = ImageOps.flip(top)
         bottom_x = top_x
-        bottom_y = screen_height_px - media_length_px
+        bottom_y = screen_height_px - top.height - top_y
 
         left = top.rotate(90, expand=True)
-        left_x = 0
-        left_y = media_length_px
+        left_x = top_y
+        left_y = int((screen_height_px - left.height) / 2)
 
         right = ImageOps.mirror(left)
-        right_x = screen_width_px - media_length_px
-        right_y = media_length_px
+        right_x = screen_height_px - right.width - top_y
+        right_y = left_y
 
-        # If in debug mode, draw the bounding boxes
+        # If in debug mode, draw the center square
         if args.debug:
+            hologram = Image.new("RGB", (screen_height_px, screen_height_px), (0, 157, 172))
+            context = Image.new("RGB", (screen_height_px, screen_height_px), (173, 243, 0))
             center = Image.new("RGB", (center_length_px, center_length_px), (255, 0, 0))
-            bounding_box = Image.new("RGB", (media_length_px, media_length_px), (0, 128, 0))
-
-            hologrified_media.paste(center, (int((screen_width_px - center_length_px) / 2),
-                                             int((screen_height_px - center_length_px) / 2)))
-            hologrified_media.paste(bounding_box, (top_x, top_y))
-            hologrified_media.paste(bounding_box, (bottom_x, bottom_y))
-            hologrified_media.paste(bounding_box, (left_x, left_y))
-            hologrified_media.paste(bounding_box, (right_x, right_y))
+            center_coord = int((screen_height_px - center_length_px) / 2)
 
         hologrified_media.paste(top, (top_x, top_y))
         hologrified_media.paste(bottom, (bottom_x, bottom_y))
         hologrified_media.paste(left, (left_x, left_y))
         hologrified_media.paste(right, (right_x, right_y))
+            hologrified_media.paste(hologram, (0, 0))
+            hologrified_media.paste(context, (screen_height_px, 0))
+            hologrified_media.paste(center, (center_coord, center_coord))
 
         return hologrified_media
 
