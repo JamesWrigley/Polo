@@ -108,6 +108,7 @@ class Polo(QWidget):
             self.center_widget(self.display_widget, 1)
             self.display_widget.showFullScreen()
 
+        self.display_widget.setWindowTitle("Polo - Display")
         self.display_widget.show()
 
         self.setLayout(hbox)
