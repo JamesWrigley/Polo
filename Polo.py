@@ -7,9 +7,10 @@ from PIL.ImageQt import ImageQt
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QKeySequence, QPixmap
-from PyQt5.QtWidgets import (QApplication, QDesktopWidget, QLabel, QFileDialog,
-                             QMessageBox, QPushButton, QHBoxLayout, QVBoxLayout,
-                             QWidget, QShortcut, QStackedWidget)
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QDesktopWidget, QLabel,
+                             QLineEdit, QFileDialog, QMessageBox, QPushButton,
+                             QHBoxLayout, QVBoxLayout, QWidget, QShortcut,
+                             QStackedWidget, QLayout)
 
 
 # Parse command-line arguments
@@ -43,14 +44,17 @@ class Polo(QWidget):
     # QLabel that displays the users selected media.
     media_preview_stack = None
 
+    # Screen dimension widgets
+    size_widget = None
+    size_checkbox = None
+    size_lineedit = None
+
     def __init__(self):
         """
         Constructor for the main application class. Creates the GUI and sets up
         the initial state.
         """
         super().__init__()
-
-        desktop_widget = QDesktopWidget()
 
         # Center master window
         self.resize(400, 200)
@@ -62,44 +66,64 @@ class Polo(QWidget):
         open_button = QPushButton("Open")
         clear_button = QPushButton("Clear")
 
+        self.size_widget = QWidget()
+        self.size_checkbox = QCheckBox("Autosize")
+        self.size_lineedit = QLineEdit("32")
+
         # Configure
+        open_button.setToolTip("Choose a media file to display")
+        clear_button.setToolTip("Clear the current media and turn off the display")
         self.media_preview_stack.addWidget(QSvgWidget("blank.svg"))
         self.media_preview_stack.addWidget(QLabel())
         self.display_widget.setScaledContents(True)
         self.display_widget.setStyleSheet("background-color: rgb(20, 20, 20);")
         self.display_widget.closed.connect(self.close)
+        self.size_lineedit.setInputMask("00 i\\n")
+        self.size_checkbox.setChecked(True)
+        self.size_checkbox.setToolTip("Use automatic screen dimensions for drawing")
 
         # Set up connections
         open_button.clicked.connect(self.choose_media)
         clear_button.clicked.connect(self.clear_media)
-        open_button.setToolTip("Choose a media file to display")
-        clear_button.setToolTip("Clear the current media and turn off the display")
+        self.size_lineedit.editingFinished.connect(lambda: self.setFocus(Qt.OtherFocusReason))
 
         # Set shortcuts
-        open_shortcut = QShortcut(QKeySequence("O"), self, context=Qt.ApplicationShortcut)
-        clear_shortcut = QShortcut(QKeySequence("C"), self, context=Qt.ApplicationShortcut)
-        close_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self, context=Qt.ApplicationShortcut)
+        makeShortcut = lambda hotkey: QShortcut(QKeySequence(hotkey), self, context=Qt.ApplicationShortcut)
+        open_shortcut = makeShortcut("O")
+        clear_shortcut = makeShortcut("C")
+        close_shortcut = makeShortcut("Ctrl+Q")
+        dimensions_shortcut = makeShortcut("A")
         open_shortcut.activated.connect(self.choose_media)
         clear_shortcut.activated.connect(self.clear_media)
         close_shortcut.activated.connect(self.close)
+        dimensions_shortcut.activated.connect(self.set_dimensions_visibility)
 
         # Pack layouts
         hbox = QHBoxLayout()
         vbox = QVBoxLayout()
+        size_hbox = QHBoxLayout()
 
-        vbox.addStretch()
+        size_hbox.addWidget(QLabel("Size:"))
+        size_hbox.addWidget(self.size_lineedit)
+
         vbox.addWidget(open_button)
         vbox.addWidget(clear_button)
+        vbox.addWidget(self.size_checkbox)
+        vbox.addWidget(self.size_widget)
         vbox.addStretch()
 
         hbox.addLayout(vbox)
         hbox.addWidget(self.media_preview_stack)
 
-        hbox.setSpacing(30)
+        hbox.setSpacing(20)
         hbox.setContentsMargins(20, 20, 20, 20)
         vbox.setSpacing(10)
 
+        size_hbox.setContentsMargins(0, 0, 0, 0)
+        self.size_widget.setLayout(size_hbox)
+
         # Create slave window
+        desktop_widget = QDesktopWidget()
         if desktop_widget.screenCount() != 2:
             QMessageBox.warning(self, "Warning", "Cannot find a second screen, " \
                                                  "display will be on primary screen.")
@@ -107,6 +131,11 @@ class Polo(QWidget):
         else:
             self.center_widget(self.display_widget, 1)
             self.display_widget.showFullScreen()
+
+        # Set default values in the screen dimension widgets
+        display_geometry = desktop_widget.screenGeometry(self.display_widget)
+        self.size_lineedit.setText(str(self.display_widget.physicalDpiX()))
+        self.size_widget.hide()
 
         self.display_widget.setWindowTitle("Polo - Display")
         self.display_widget.show()
@@ -137,23 +166,31 @@ class Polo(QWidget):
         image. Note that the media is mirrored in the left side of the screen,
         leaving the right side to be used for some other purpose.
         """
-        # Dimensions of the screen, assuming `self.display_widget` is fullscreen
-        # and it is running on our TV. We need to hardcode some values for the TV
-        # since Qt cannot obtain the correct ones by itself.
         center_length_mm = 100
-        dpi = 68.84
-        screen_width_mm = 701 # self.display_widget.widthMM()
-        screen_height_mm = 398 # self.display_widget.heightMM()
         screen_width_px = self.display_widget.width()
         screen_height_px = self.display_widget.height()
 
+        dpmm = -1 # Dots (i.e. pixels) per millimeter
+        screen_width_mm = -1
+        screen_height_mm = -1
+
+        if self.size_checkbox.isChecked():
+            dpmm = self.display_widget.physicalDpiX() / 25.4
+            screen_width_mm = self.display_widget.widthMM()
+            screen_height_mm = self.display_widget.heightMM()
+        else:
+            diagonal_length_mm = int(self.size_lineedit.text()[:2]) * 25.4
+            dpmm = (screen_width_px**2 + screen_height_px**2)**0.5 / diagonal_length_mm
+            screen_width_mm = screen_width_px / dpmm
+            screen_height_mm = screen_height_px / dpmm
+
         # Calculate the bounding box side length of each of the images, based
         # off the height because that's our limiting dimension.
-        media_length_mm = (screen_height_mm - center_length_mm) / 2
+        media_length_mm = abs(screen_height_mm - center_length_mm) / 2
 
         # Convert to pixels
-        media_length_px = int(media_length_mm * dpi / 25.4)
-        center_length_px = int(center_length_mm * dpi / 25.4)
+        media_length_px = int(media_length_mm * dpmm)
+        center_length_px = int(center_length_mm * dpmm)
 
         # Create the mirrored images, and calculate their locations
         top = media.copy()
@@ -217,6 +254,11 @@ class Polo(QWidget):
         An override to close the slave window when the master window closes.
         """
         self.display_widget.close()
+
+    def set_dimensions_visibility(self):
+        visibility = self.size_checkbox.isChecked()
+        self.size_checkbox.setChecked(not visibility)
+        self.size_widget.setVisible(visibility)
 
 
 if __name__ == "__main__":
