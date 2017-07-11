@@ -5,7 +5,7 @@ from PIL import Image, ImageOps
 from PIL.ImageQt import ImageQt
 
 from PyQt5.QtSvg import QSvgWidget
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QKeySequence, QPixmap
 from PyQt5.QtWidgets import (QApplication, QDesktopWidget, QLabel, QFileDialog,
                              QMessageBox, QPushButton, QHBoxLayout, QVBoxLayout,
@@ -76,9 +76,9 @@ class Polo(QWidget):
         clear_button.setToolTip("Clear the current media and turn off the display")
 
         # Set shortcuts
-        open_shortcut = QShortcut(QKeySequence("O"), self)
-        clear_shortcut = QShortcut(QKeySequence("C"), self)
-        close_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
+        open_shortcut = QShortcut(QKeySequence("O"), self, context=Qt.ApplicationShortcut)
+        clear_shortcut = QShortcut(QKeySequence("C"), self, context=Qt.ApplicationShortcut)
+        close_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self, context=Qt.ApplicationShortcut)
         open_shortcut.activated.connect(self.choose_media)
         clear_shortcut.activated.connect(self.clear_media)
         close_shortcut.activated.connect(self.close)
