@@ -8,9 +8,9 @@ from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtGui import QKeySequence, QPixmap
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QDesktopWidget, QLabel,
-                             QLineEdit, QFileDialog, QMessageBox, QPushButton,
-                             QHBoxLayout, QVBoxLayout, QWidget, QShortcut,
-                             QStackedWidget, QLayout)
+                             QLineEdit, QFileDialog, QLayout, QMessageBox,
+                             QPushButton, QHBoxLayout, QVBoxLayout, QWidget,
+                             QShortcut, QSizePolicy, QStackedWidget)
 
 
 # Parse command-line arguments
@@ -33,6 +33,9 @@ class DisplayWidget(QLabel):
         self.closed.emit()
 
 class Polo(QWidget):
+    # The input media
+    media = None
+
     # The hologrified media as a Qt-compatible object (i.e. ImageQt)
     qmedia = None
 
@@ -65,16 +68,19 @@ class Polo(QWidget):
         self.media_preview_stack = QStackedWidget()
         open_button = QPushButton("Open")
         clear_button = QPushButton("Clear")
+        preview_label = QLabel()
 
         self.size_widget = QWidget()
         self.size_checkbox = QCheckBox("Autosize")
         self.size_lineedit = QLineEdit("32")
 
         # Configure
+        preview_label.setScaledContents(True)
+        preview_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         open_button.setToolTip("Choose a media file to display")
         clear_button.setToolTip("Clear the current media and turn off the display")
         self.media_preview_stack.addWidget(QSvgWidget("blank.svg"))
-        self.media_preview_stack.addWidget(QLabel())
+        self.media_preview_stack.addWidget(preview_label)
         self.display_widget.setScaledContents(True)
         self.display_widget.setStyleSheet("background-color: rgb(20, 20, 20);")
         self.display_widget.closed.connect(self.close)
@@ -85,7 +91,9 @@ class Polo(QWidget):
         # Set up connections
         open_button.clicked.connect(self.choose_media)
         clear_button.clicked.connect(self.clear_media)
+        self.size_checkbox.stateChanged.connect(self.set_dimensions_visibility)
         self.size_lineedit.editingFinished.connect(lambda: self.setFocus(Qt.OtherFocusReason))
+        self.size_lineedit.editingFinished.connect(self.refresh)
 
         # Set shortcuts
         makeShortcut = lambda hotkey: QShortcut(QKeySequence(hotkey), self, context=Qt.ApplicationShortcut)
@@ -96,7 +104,7 @@ class Polo(QWidget):
         open_shortcut.activated.connect(self.choose_media)
         clear_shortcut.activated.connect(self.clear_media)
         close_shortcut.activated.connect(self.close)
-        dimensions_shortcut.activated.connect(self.set_dimensions_visibility)
+        dimensions_shortcut.activated.connect(self.size_checkbox.toggle)
 
         # Pack layouts
         hbox = QHBoxLayout()
@@ -134,7 +142,6 @@ class Polo(QWidget):
 
         # Set default values in the screen dimension widgets
         display_geometry = desktop_widget.screenGeometry(self.display_widget)
-        self.size_lineedit.setText(str(self.display_widget.physicalDpiX()))
         self.size_widget.hide()
 
         self.display_widget.setWindowTitle("Polo - Display")
@@ -152,12 +159,18 @@ class Polo(QWidget):
         media_path = QFileDialog.getOpenFileName(self, "Select Media",
                                                  filter="Images (*.jpeg *.jpg *.png *.gif)")
         if media_path[0]:
-            media = self.hologrify(Image.open(media_path[0]))
-            self.qmedia = ImageQt(media)
+            self.media = Image.open(media_path[0])
+            self.qmedia = ImageQt(self.hologrify(self.media))
+            self.refresh()
 
+    def refresh(self):
+        """
+        [Re]loads the current media onto the preview widget and display window.
+        """
+        if self.media is not None:
+            self.qmedia = ImageQt(self.hologrify(self.media))
             self.display_widget.setPixmap(QPixmap.fromImage(self.qmedia))
-            preview_label = self.media_preview_stack.widget(1)
-            preview_label.setStyleSheet("border-image: url({0})".format(media_path[0]))
+            self.media_preview_stack.widget(1).setPixmap(QPixmap.fromImage(ImageQt(self.media)))
             self.media_preview_stack.setCurrentIndex(1)
 
     def hologrify(self, media):
@@ -255,11 +268,9 @@ class Polo(QWidget):
         """
         self.display_widget.close()
 
-    def set_dimensions_visibility(self):
-        visibility = self.size_checkbox.isChecked()
-        self.size_checkbox.setChecked(not visibility)
-        self.size_widget.setVisible(visibility)
-
+    def set_dimensions_visibility(self, state=None):
+        self.refresh()
+        self.size_widget.setVisible(not self.size_checkbox.isChecked())
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
