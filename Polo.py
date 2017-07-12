@@ -84,7 +84,7 @@ class Polo(QWidget):
         self.display_widget.setScaledContents(True)
         self.display_widget.setStyleSheet("background-color: rgb(20, 20, 20);")
         self.display_widget.closed.connect(self.close)
-        self.size_lineedit.setInputMask("00 i\\n")
+        self.size_lineedit.setInputMask("D0 \\i\\n")
         self.size_checkbox.setChecked(True)
         self.size_checkbox.setToolTip("Use automatic screen dimensions for drawing")
 
