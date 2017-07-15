@@ -54,8 +54,10 @@ class Polo(QWidget):
     # The widget in the slave window that displays `qmedia`
     display_widget = None
 
-    # Diagonal size of the output screen
+    # Diagonal size of the output screen, and its hotkey to enable/disable
+    # manual mode.
     output_screen_size = -1
+    dimensions_shortcut = None
 
     # A QStackedWidget that holds both preview widgets, the first being a
     # QSvgWidget displaying the default preview image, and the second being a
@@ -103,6 +105,7 @@ class Polo(QWidget):
         self.display_widget.setStyleSheet("background-color: rgb(20, 20, 20);")
         self.display_widget.closed.connect(self.close)
         self.size_checkbox.setChecked(True)
+        self.size_checkbox.setEnabled(False)
         self.size_checkbox.setToolTip("Use automatic screen dimensions for drawing")
 
         # Set up connections
@@ -117,11 +120,13 @@ class Polo(QWidget):
         open_shortcut = makeShortcut("O")
         clear_shortcut = makeShortcut("C")
         close_shortcut = makeShortcut("Ctrl+Q")
-        dimensions_shortcut = makeShortcut("A")
+        self.dimensions_shortcut = makeShortcut("A")
+        self.dimensions_shortcut.setEnabled(False)
+
         open_shortcut.activated.connect(self.choose_media)
         clear_shortcut.activated.connect(self.clear_media)
         close_shortcut.activated.connect(self.close)
-        dimensions_shortcut.activated.connect(self.size_checkbox.toggle)
+        self.dimensions_shortcut.activated.connect(self.size_checkbox.toggle)
 
         # Pack layouts
         hbox = QHBoxLayout()
@@ -188,6 +193,8 @@ class Polo(QWidget):
                 self.media = Image.open(media_path[0])
                 self.qmedia = ImageQt(self.hologrify(self.media))
 
+            self.size_checkbox.setEnabled(True)
+            self.dimensions_shortcut.setEnabled(True)
             self.refresh()
 
     def refresh(self):
@@ -333,6 +340,8 @@ class Polo(QWidget):
         self.qmedia = None
         self.display_widget.clear()
         self.media_preview_stack.setCurrentIndex(0)
+        self.size_checkbox.setEnabled(False)
+        self.dimensions_shortcut.setEnabled(False)
 
     def center_widget(self, widget, screen):
         """
