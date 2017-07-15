@@ -353,7 +353,7 @@ class Polo(QWidget):
 
         self.display_widget.close()
 
-    def set_dimensions_visibility(self, state=None):
+    def set_dimensions_visibility(self):
         self.refresh()
         self.size_widget.setVisible(not self.size_checkbox.isChecked())
 
