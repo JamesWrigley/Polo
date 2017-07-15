@@ -1,8 +1,11 @@
 import sys
+import time
+import imageio
 import argparse
+import threading
 
-from PIL import Image, ImageOps
 from PIL.ImageQt import ImageQt
+from PIL import Image, ImageOps, ImageFile
 
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtCore import pyqtSignal, Qt
@@ -12,6 +15,8 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QDesktopWidget, QLabel,
                              QPushButton, QHBoxLayout, QVBoxLayout, QWidget,
                              QShortcut, QSizePolicy, QStackedWidget)
 
+# A video type alias for convenience
+Video = imageio.plugins.ffmpeg.FfmpegFormat.Reader
 
 # Parse command-line arguments
 arg_parser = argparse.ArgumentParser("Polo")
@@ -39,8 +44,18 @@ class Polo(QWidget):
     # The hologrified media as a Qt-compatible object (i.e. ImageQt)
     qmedia = None
 
+    # The current frame if the input media is a video
+    current_frame = -1
+
+    # The play() thread that keeps the display widget and preview updated if the
+    # input media is a video
+    player_thread = None
+
     # The widget in the slave window that displays `qmedia`
     display_widget = None
+
+    # Diagonal size of the output screen
+    output_screen_size = -1
 
     # A QStackedWidget that holds both preview widgets, the first being a
     # QSvgWidget displaying the default preview image, and the second being a
@@ -50,7 +65,6 @@ class Polo(QWidget):
     # Screen dimension widgets
     size_widget = None
     size_checkbox = None
-    size_lineedit = None
 
     def __init__(self):
         """
@@ -58,6 +72,9 @@ class Polo(QWidget):
         the initial state.
         """
         super().__init__()
+
+        self.player_thread = threading.Thread()
+        self.output_screen_size = 32
 
         # Center master window
         self.resize(400, 200)
@@ -72,31 +89,31 @@ class Polo(QWidget):
 
         self.size_widget = QWidget()
         self.size_checkbox = QCheckBox("Autosize")
-        self.size_lineedit = QLineEdit("32")
+        size_lineedit = QLineEdit(str(self.output_screen_size))
 
         # Configure
         preview_label.setScaledContents(True)
         preview_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         open_button.setToolTip("Choose a media file to display")
         clear_button.setToolTip("Clear the current media and turn off the display")
+        size_lineedit.setInputMask("D0 \\i\\n")
         self.media_preview_stack.addWidget(QSvgWidget("blank.svg"))
         self.media_preview_stack.addWidget(preview_label)
         self.display_widget.setScaledContents(True)
         self.display_widget.setStyleSheet("background-color: rgb(20, 20, 20);")
         self.display_widget.closed.connect(self.close)
-        self.size_lineedit.setInputMask("D0 \\i\\n")
         self.size_checkbox.setChecked(True)
         self.size_checkbox.setToolTip("Use automatic screen dimensions for drawing")
 
         # Set up connections
         open_button.clicked.connect(self.choose_media)
         clear_button.clicked.connect(self.clear_media)
+        size_lineedit.editingFinished.connect(self.size_changed)
         self.size_checkbox.stateChanged.connect(self.set_dimensions_visibility)
-        self.size_lineedit.editingFinished.connect(lambda: self.setFocus(Qt.OtherFocusReason))
-        self.size_lineedit.editingFinished.connect(self.refresh)
 
         # Set shortcuts
-        makeShortcut = lambda hotkey: QShortcut(QKeySequence(hotkey), self, context=Qt.ApplicationShortcut)
+        makeShortcut = lambda hotkey: QShortcut(QKeySequence(hotkey), self,
+                                                context=Qt.ApplicationShortcut)
         open_shortcut = makeShortcut("O")
         clear_shortcut = makeShortcut("C")
         close_shortcut = makeShortcut("Ctrl+Q")
@@ -112,7 +129,7 @@ class Polo(QWidget):
         size_hbox = QHBoxLayout()
 
         size_hbox.addWidget(QLabel("Size:"))
-        size_hbox.addWidget(self.size_lineedit)
+        size_hbox.addWidget(size_lineedit)
 
         vbox.addWidget(open_button)
         vbox.addWidget(clear_button)
@@ -153,25 +170,76 @@ class Polo(QWidget):
 
     def choose_media(self):
         """
-        Open a dialog for the user to select a media file (currently only images
-        are supported).
+        Open a dialog for the user to select a media file.
         """
+        formatify = lambda formats: " *.".join([""] + formats).strip()
+        image_formats = ["bmp", "gif", "jpeg", "jpg", "png", "ppm"]
+        video_formats = ["avi", "mkv", "mov", "mp4", "mpg", "mpeg"]
         media_path = QFileDialog.getOpenFileName(self, "Select Media",
-                                                 filter="Images (*.jpeg *.jpg *.png *.gif)")
+                                                 filter="Images ({0});;".format(formatify(image_formats)) +
+                                                        "Videos ({0})".format(formatify(video_formats)))
+
         if media_path[0]:
-            self.media = Image.open(media_path[0])
-            self.qmedia = ImageQt(self.hologrify(self.media))
+            if any(media_path[0].endswith(codec) for codec in video_formats):
+                imageio.plugins.ffmpeg.download()
+                self.media = imageio.get_reader(media_path[0], "ffmpeg")
+                self.qmedia = None
+            else:
+                self.media = Image.open(media_path[0])
+                self.qmedia = ImageQt(self.hologrify(self.media))
+
             self.refresh()
 
     def refresh(self):
         """
         [Re]loads the current media onto the preview widget and display window.
         """
-        if self.media is not None:
+        if issubclass(type(self.media), ImageFile.ImageFile):
             self.qmedia = ImageQt(self.hologrify(self.media))
             self.display_widget.setPixmap(QPixmap.fromImage(self.qmedia))
             self.media_preview_stack.widget(1).setPixmap(QPixmap.fromImage(ImageQt(self.media)))
-            self.media_preview_stack.setCurrentIndex(1)
+        elif type(self.media) is Video and not self.player_thread.is_alive():
+            self.player_thread = threading.Thread(target=self.play)
+            self.player_thread.start()
+
+        self.media_preview_stack.setCurrentIndex(1)
+
+    def play(self):
+        """
+        Starts playing the current video in a loop.
+        """
+        i = 0
+        fps = int(self.media.get_meta_data()["fps"])
+        while type(self.media) is Video:
+            # Disable updates while drawing the frame to avoid segfaults
+            self.setUpdatesEnabled(False)
+
+            # Sometimes FFMPEG doesn't report the length of the video correctly
+            try:
+                frame = Image.fromarray(self.media.get_data(i % (len(self.media) - 1)))
+            except RuntimeError:
+                i = 0
+                continue
+
+            # Display hologrified frame
+            self.qmedia = ImageQt(self.hologrify(frame))
+            self.display_widget.setPixmap(QPixmap.fromImage(self.qmedia))
+            self.media_preview_stack.widget(1).setPixmap(QPixmap.fromImage(ImageQt(frame)))
+
+            i += 1
+            self.setUpdatesEnabled(True)
+
+            # Sleep until it's time to show the next frame
+            time.sleep(1 / fps)
+
+    def stop(self):
+        # We make a new reference to the video object so we can close it
+        # before setting it to None, which avoids a race condition with
+        # self.player_thread.
+        video = self.media
+        self.media = None
+        video.close()
+        self.player_thread.join()
 
     def hologrify(self, media):
         """
@@ -192,7 +260,7 @@ class Polo(QWidget):
             screen_width_mm = self.display_widget.widthMM()
             screen_height_mm = self.display_widget.heightMM()
         else:
-            diagonal_length_mm = int(self.size_lineedit.text()[:2]) * 25.4
+            diagonal_length_mm = self.output_screen_size * 25.4
             dpmm = (screen_width_px**2 + screen_height_px**2)**0.5 / diagonal_length_mm
             screen_width_mm = screen_width_px / dpmm
             screen_height_mm = screen_height_px / dpmm
@@ -245,11 +313,24 @@ class Polo(QWidget):
 
         return hologrified_media
 
+    def size_changed(self):
+        """
+        Slot, called when the user changes the size of the screen (when autosize
+        is turned off).
+        """
+        self.setFocus(Qt.OtherFocusReason)
+        self.output_screen_size = int(self.sender().text()[:2])
+        self.refresh()
+
     def clear_media(self):
         """
         Reset the display widget to a solid color and the preview to the default
         SVG image (crosses).
         """
+        if type(self.media) is Video:
+            self.stop()
+
+        self.qmedia = None
         self.display_widget.clear()
         self.media_preview_stack.setCurrentIndex(0)
 
@@ -264,8 +345,12 @@ class Polo(QWidget):
 
     def closeEvent(self, event):
         """
-        An override to close the slave window when the master window closes.
+        An override to close the slave window when the master window closes, and
+        join the player thread if a video is playing.
         """
+        if type(self.media) is Video:
+            self.stop()
+
         self.display_widget.close()
 
     def set_dimensions_visibility(self, state=None):
