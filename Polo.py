@@ -188,6 +188,10 @@ class Polo(QWidget):
         if media_path[0]:
             if any(media_path[0].endswith(codec) for codec in video_formats):
                 imageio.plugins.ffmpeg.download()
+
+                if type(self.media) is Video:
+                    self.stop()
+
                 self.media = imageio.get_reader(media_path[0], "ffmpeg")
                 self.qmedia = None
             else:
