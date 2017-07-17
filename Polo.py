@@ -323,7 +323,7 @@ class Polo(QWidget):
         bottom_x = top_x
         bottom_y = screen_height_px - top.height - top_y
 
-        left = top.rotate(90, expand=True)
+        left = ImageOps.flip(top.rotate(90, expand=True))
         left_x = top_y
         left_y = int((screen_height_px - left.height) / 2)
 
