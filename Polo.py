@@ -1,5 +1,6 @@
 import sys
 import time
+import queue
 import imageio
 import argparse
 import threading
@@ -215,29 +216,57 @@ class Polo(QWidget):
         """
         Starts playing the current video in a loop.
         """
-        i = 0
         fps = int(self.media.get_meta_data()["fps"])
+        frame_buffer = queue.Queue(10)
+
+        def process_frames():
+            i = 0
+
+            while type(self.media) is Video:
+                # Sometimes FFMPEG doesn't report the length of the video correctly
+                try:
+                    frame = Image.fromarray(self.media.get_data(i % len(self.media)))
+                    i += 1
+                except RuntimeError:
+                    i = 0
+                    continue
+
+                frame_tuple = [QPixmap.fromImage(ImageQt(self.hologrify(frame))), None]
+                if i % fps == 0:
+                    preview = frame.copy()
+                    thumbnail_size = self.media_preview_stack.widget(1).size()
+                    preview.thumbnail((thumbnail_size.width(), thumbnail_size.height()))
+                    frame_tuple[1] = QPixmap.fromImage(ImageQt(frame))
+
+                # If we need to start dropping frames, then this probably means
+                # that the media has been reset and we are no longer playing a
+                # video.
+                try:
+                    frame_buffer.put(frame_tuple, timeout=2/fps)
+                except queue.Full:
+                    continue
+
+        # Start producer thread which will pre-process frames and put them into
+        # the frame buffer to avoid lag.
+        frame_producer = threading.Thread(target=process_frames)
+        frame_producer.start()
+
         while type(self.media) is Video:
-            # Disable updates while drawing the frame to avoid segfaults
+            # Display hologrified frame
             self.setUpdatesEnabled(False)
 
-            # Sometimes FFMPEG doesn't report the length of the video correctly
-            try:
-                frame = Image.fromarray(self.media.get_data(i % (len(self.media) - 1)))
-            except RuntimeError:
-                i = 0
-                continue
+            frame_tuple = frame_buffer.get()
+            self.display_widget.setPixmap(frame_tuple[0])
 
-            # Display hologrified frame
-            self.qmedia = ImageQt(self.hologrify(frame))
-            self.display_widget.setPixmap(QPixmap.fromImage(self.qmedia))
-            self.media_preview_stack.widget(1).setPixmap(QPixmap.fromImage(ImageQt(frame)))
+            if frame_tuple[1] is not None:
+                self.media_preview_stack.widget(1).setPixmap(frame_tuple[1].copy())
 
-            i += 1
             self.setUpdatesEnabled(True)
 
             # Sleep until it's time to show the next frame
             time.sleep(1 / fps)
+
+        frame_producer.join()
 
     def stop(self):
         # We make a new reference to the video object so we can close it
