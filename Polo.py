@@ -236,11 +236,11 @@ class Polo(QWidget):
                     continue
 
                 frame_tuple = [QPixmap.fromImage(ImageQt(self.hologrify(frame))), None]
-                if i % fps == 0:
-                    preview = frame.copy()
+                if i % fps == 0: # Update the preview every second
                     thumbnail_size = self.media_preview_stack.widget(1).size()
-                    preview.thumbnail((thumbnail_size.width(), thumbnail_size.height()))
-                    frame_tuple[1] = QPixmap.fromImage(ImageQt(frame))
+                    frame.thumbnail((thumbnail_size.width(), thumbnail_size.height()))
+                    qimage = ImageQt(frame)
+                    frame_tuple[1] = QPixmap.fromImage(qimage)
 
                 # If we need to start dropping frames, then this probably means
                 # that the media has been reset and we are no longer playing a
@@ -263,11 +263,10 @@ class Polo(QWidget):
             self.display_widget.setPixmap(frame_tuple[0])
 
             if frame_tuple[1] is not None:
-                self.media_preview_stack.widget(1).setPixmap(frame_tuple[1].copy())
-
-            self.setUpdatesEnabled(True)
+                self.media_preview_stack.widget(1).setPixmap(frame_tuple[1])
 
             # Sleep until it's time to show the next frame
+            self.setUpdatesEnabled(True)
             time.sleep(1 / fps)
 
         frame_producer.join()
