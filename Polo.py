@@ -257,16 +257,16 @@ class Polo(QWidget):
 
         while type(self.media) is Video:
             # Display hologrified frame
-            self.setUpdatesEnabled(False)
 
             frame_tuple = frame_buffer.get()
             self.display_widget.setPixmap(frame_tuple[0])
 
             if frame_tuple[1] is not None:
+                self.setUpdatesEnabled(False)
                 self.media_preview_stack.widget(1).setPixmap(frame_tuple[1])
+                self.setUpdatesEnabled(True)
 
             # Sleep until it's time to show the next frame
-            self.setUpdatesEnabled(True)
             time.sleep(1 / fps)
 
         frame_producer.join()
