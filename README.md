@@ -11,25 +11,33 @@ optional arguments:
 ```
 
 Hotkeys:
-* `O`: Open media file (currently only images are supported).
+* `O`: Open media file (images or videos).
 * `C`: Clear current media.
+* `N`: Go to the next media in the current directory.
+* `P`: Go to the previous media in the current directory.
+* `A`: Toggle automatic scaling. Polo attempts to automatically detect the DPI
+       of the display device in order to correctly scale the images, but this is not
+       always possible, so disabling automatic scaling will let the user enter
+       the diagonal length of their display device (in inches).
 * `Ctrl + Q`: Quit Polo.
 
 ## Requirements
 * Python 3
 * PyQt5
 * Pillow
+* imageio
 
-Tested on Linux, in theory should work on Windows and OSX.
+Tested on Windows and Linux, in theory should work on OSX.
 
 ## Quickstart
 This assumes that you have Python 3 installed and are in the cloned source
 directory:
 
 ```bash
-# Install dependencies (only need to run once)
+# Install dependencies (only need to run this once)
 pip3 install --user pyqt5
 pip3 install --user pillow
+pip3 install --user imageio
 
 # Run Polo
 python3 Polo.py
