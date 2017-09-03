@@ -1,6 +1,7 @@
 # Polo
-A hologram image creator that mirrors its input for use in a right-frustum style
-hologram. Meant to be used with two screens (one master, one slave).
+A hologram image creator that [mirrors](https://jamesw.bio/images/polo.png) its
+input for use in a right-frustum style hologram. Meant to be used with two
+screens (one master, one slave).
 
 ```
 usage: Polo [-h] [--debug]
