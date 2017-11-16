@@ -225,10 +225,12 @@ class Polo(QWidget):
         if media_path[0]:
             media_glob = str(Path(media_path[0]).parent / "*")
             self.files = [f for f in glob.glob(media_glob)
-                          if self.get_fmt(f) in (self.image_fmts + self.video_fmts)]
+                          if self.get_fmt(f) in (self.image_fmts + self.video_fmts
+                                                 + list(map(lambda x: x.upper(), self.image_fmts))
+                                                 + list(map(lambda x: x.upper(), self.video_fmts)))]
             self.files.sort(key=str.lower)
 
-            self.current_file_index = self.files.index(media_path[0])
+            self.current_file_index = self.files.index(str(Path(media_path[0])))
             self.set_media()
 
     def set_media(self):
@@ -330,7 +332,6 @@ class Polo(QWidget):
 
         while type(self.media) is Video:
             # Display hologrified frame
-
             frame_tuple = frame_buffer.get()
             self.display_widget.setPixmap(frame_tuple[0])
 
