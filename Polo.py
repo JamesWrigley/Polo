@@ -226,8 +226,7 @@ class Polo(QWidget):
             media_glob = str(Path(media_path[0]).parent / "*")
             self.files = [f for f in glob.glob(media_glob)
                           if self.get_fmt(f) in (self.image_fmts + self.video_fmts
-                                                 + list(map(lambda x: x.upper(), self.image_fmts))
-                                                 + list(map(lambda x: x.upper(), self.video_fmts)))]
+                                                 + [fmt.upper() for fmt in self.image_fmts + self.video_fmts])]
             self.files.sort(key=str.lower)
 
             self.current_file_index = self.files.index(str(Path(media_path[0])))
