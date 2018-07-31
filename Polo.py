@@ -240,10 +240,10 @@ class Polo(QWidget):
         fmt = self.get_fmt(media_path)
 
         # If the media is an image
-        if fmt in self.image_fmts:
+        if fmt.lower() in self.image_fmts:
             self.media = Image.open(media_path)
             self.qmedia = ImageQt(self.hologrify(self.media))
-        elif fmt in self.video_fmts: # If it's a video
+        elif fmt.lower() in self.video_fmts: # If it's a video
             imageio.plugins.ffmpeg.download()
 
             if type(self.media) is Video:
